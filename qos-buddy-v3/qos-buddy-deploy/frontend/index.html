@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>QoS Buddy — MindForge</title>
+<style>
+:root {
+  --bg:#080c14; --surface:#0f1623; --card:#141d2e; --border:#1e2d45;
+  --accent:#3b82f6; --accent2:#6366f1; --green:#22c55e;
+  --yellow:#f59e0b; --orange:#f97316; --red:#ef4444;
+  --text:#e2e8f0; --muted:#64748b; --subtle:#94a3b8;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+     background:var(--bg);color:var(--text);min-height:100vh}
+
+/* ── OFFLINE BANNER */
+#offline-banner{
+  display:none;position:fixed;top:0;left:0;right:0;z-index:9999;
+  background:#7f1d1d;color:#fca5a5;
+  padding:12px 24px;
+  border-bottom:2px solid var(--red);
+  font-size:14px;font-weight:700;
+  align-items:center;justify-content:space-between;
+  gap:16px;
+}
+#offline-banner.show{display:flex}
+#offline-banner button{
+  background:transparent;border:1px solid #ef4444;color:#fca5a5;
+  cursor:pointer;border-radius:6px;padding:4px 12px;font-size:13px;
+}
+
+/* ── NAV */
+nav{
+  position:fixed;top:0;left:0;right:0;z-index:100;
+  background:rgba(8,12,20,.92);backdrop-filter:blur(16px);
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 28px;height:58px;
+  transition:top .3s;
+}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-icon{width:34px;height:34px;border-radius:9px;
+           background:linear-gradient(135deg,var(--accent),var(--accent2));
+           display:flex;align-items:center;justify-content:center;
+           font-size:17px;font-weight:900;color:#fff}
+.logo-name{font-size:15px;font-weight:800}
+.logo-by{font-size:10px;color:var(--muted)}
+.nav-tabs{display:flex;gap:4px}
+.nav-tab{
+  background:transparent;border:none;border-bottom:2px solid transparent;
+  color:var(--muted);font-size:13px;cursor:pointer;padding:4px 14px 4px;
+  transition:color .2s,border-color .2s;font-family:inherit;
+}
+.nav-tab.active{color:var(--text);font-weight:700;border-bottom-color:var(--accent)}
+.live-pill{
+  display:flex;align-items:center;gap:8px;
+  background:var(--card);border:1px solid var(--border);
+  border-radius:20px;padding:5px 14px;font-size:12px;
+}
+#ndot{width:7px;height:7px;border-radius:50%;background:var(--muted);flex-shrink:0}
+#ndot.on{background:var(--green);animation:blink 2s infinite}
+#ndot.offline{background:var(--red);animation:none}
+#nstatus{color:var(--subtle)}
+
+/* ── TABS CONTENT */
+.tab-content{display:none;padding-top:80px}
+.tab-content.active{display:block}
+
+/* ── HERO */
+.hero{
+  min-height:42vh;display:flex;align-items:center;justify-content:center;
+  text-align:center;padding:60px 24px 40px;
+  background:radial-gradient(ellipse 70% 50% at 50% 0%,rgba(59,130,246,.1) 0%,transparent 70%)
+}
+.hero-badge{
+  display:inline-flex;align-items:center;gap:6px;
+  background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.25);
+  color:var(--accent);border-radius:20px;padding:5px 16px;
+  font-size:12px;font-weight:700;letter-spacing:.06em;margin-bottom:20px
+}
+.hero h1{
+  font-size:clamp(36px,6vw,70px);font-weight:900;line-height:1.05;
+  background:linear-gradient(135deg,#fff 30%,#64748b);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:10px
+}
+.hero h1 em{
+  font-style:normal;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent
+}
+.hero-desc{color:var(--subtle);max-width:520px;margin:0 auto 32px;line-height:1.7;font-size:15px}
+.stats-row{
+  display:flex;justify-content:center;
+  border:1px solid var(--border);border-radius:16px;overflow:hidden
+}
+.stat-item{
+  padding:16px 28px;border-right:1px solid var(--border);text-align:center;flex:1
+}
+.stat-item:last-child{border-right:none}
+.stat-val{font-size:26px;font-weight:900}
+.stat-lbl{font-size:11px;color:var(--muted);margin-top:2px}
+
+/* ── WRAP */
+.wrap{max-width:1100px;margin:0 auto;padding:0 24px 80px}
+
+/* ── CONTROLS */
+.live-top{
+  display:flex;align-items:center;justify-content:space-between;
+  flex-wrap:wrap;gap:14px;margin-bottom:20px
+}
+.net-pill{
+  display:flex;align-items:center;gap:10px;
+  background:var(--card);border:1px solid var(--border);
+  border-radius:12px;padding:10px 18px
+}
+.net-icon{font-size:20px}
+.net-name-text{font-size:13px;font-weight:700}
+.net-status{font-size:11px;margin-top:2px}
+.online-txt{color:var(--green)}
+.offline-txt{color:var(--red)}
+
+.ctrl-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:22px}
+.cbtn{
+  padding:11px 20px;border-radius:11px;border:none;cursor:pointer;
+  font-size:13px;font-weight:700;
+  transition:transform .15s,opacity .2s;color:#fff;font-family:inherit
+}
+.cbtn:hover:not(:disabled){transform:translateY(-2px)}
+.cbtn:disabled{opacity:.45;cursor:not-allowed}
+.cbtn-demo{background:linear-gradient(135deg,var(--accent),var(--accent2));box-shadow:0 4px 16px rgba(59,130,246,.25)}
+.cbtn-real{background:linear-gradient(135deg,var(--green),#16a34a);box-shadow:0 4px 16px rgba(34,197,94,.2)}
+.cbtn-stop{background:linear-gradient(135deg,var(--red),#b91c1c)}
+.cbtn-pdf{background:var(--card);border:1px solid var(--border)!important;color:var(--subtle)!important}
+.cbtn-pdf:hover:not(:disabled){border-color:var(--accent)!important;color:var(--accent)!important}
+
+/* ── PDF ERROR */
+#pdf-error{
+  display:none;background:rgba(239,68,68,.1);border:1px solid var(--red);
+  border-radius:10px;padding:10px 16px;color:var(--red);font-size:13px;margin-bottom:14px
+}
+#pdf-error.show{display:block}
+
+/* ── WAITING */
+.waiting{
+  text-align:center;padding:60px 24px;
+  background:var(--card);border:1px solid var(--border);border-radius:20px
+}
+.spinner{
+  width:40px;height:40px;border-radius:50%;
+  border:3px solid var(--border);border-top-color:var(--accent);
+  animation:spin 1s linear infinite;margin:0 auto 16px
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.waiting p{color:var(--muted);font-size:14px}
+
+/* ── RISK CARD */
+.risk-card{
+  border-radius:20px;padding:26px;margin-bottom:14px;
+  border:1.5px solid;display:flex;align-items:center;gap:24px
+}
+.gauge-wrap{position:relative;width:80px;height:80px;flex-shrink:0}
+.gauge-wrap svg{transform:rotate(-90deg)}
+.gauge-label{
+  position:absolute;top:50%;left:50%;
+  transform:translate(-50%,-50%);text-align:center
+}
+.gauge-num{font-size:20px;font-weight:900}
+.gauge-sub{font-size:10px;color:var(--muted)}
+.risk-info h2{font-size:18px;font-weight:800;margin-bottom:5px}
+.risk-info p{font-size:13px;color:var(--subtle);margin-bottom:10px}
+.rf-tag{
+  display:inline-flex;align-items:center;gap:5px;
+  background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.25);
+  color:var(--accent2);border-radius:20px;padding:4px 12px;font-size:12px;font-weight:700
+}
+
+/* ── KPI GRID */
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
+@media(max-width:640px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
+.kpi{
+  background:var(--card);border:1px solid var(--border);border-radius:14px;
+  padding:18px 14px;text-align:center
+}
+.kpi-val{font-size:22px;font-weight:900;margin-bottom:3px}
+.kpi-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.kpi-bar{height:3px;border-radius:2px;margin-top:10px}
+
+/* ── PANELS */
+.panels{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+@media(max-width:680px){.panels{grid-template-columns:1fr}}
+.panel{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px}
+.panel-hd{font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:14px}
+.full{grid-column:1/-1}
+.h-row{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.h-row:last-child{margin-bottom:0}
+.h-lbl{font-size:12px;color:var(--muted);width:82px;flex-shrink:0}
+.h-bg{flex:1;height:6px;background:rgba(255,255,255,.05);border-radius:3px;overflow:hidden}
+.h-fill{height:100%;border-radius:3px;transition:width .6s}
+.h-score{font-size:12px;font-weight:700;width:50px;text-align:right}
+.sec-badge{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:5px 14px;border-radius:20px;font-size:12px;font-weight:700;margin-bottom:10px
+}
+.mrow{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.mrow:last-child{border:none}
+.mlbl{font-size:12px;color:var(--muted)}
+.mval{font-size:13px;font-weight:700}
+.arow{display:flex;align-items:flex-start;gap:10px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.arow:last-child{border:none}
+.abadge{font-size:9px;font-weight:900;padding:3px 7px;border-radius:4px;flex-shrink:0;margin-top:2px;letter-spacing:.04em}
+.srow{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.srow:last-child{margin-bottom:0}
+.sname{font-size:11px;color:var(--muted);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sbg{width:70px;height:5px;background:rgba(255,255,255,.05);border-radius:3px;overflow:hidden;flex-shrink:0}
+.sfill{height:100%;border-radius:3px}
+.sval{font-size:11px;font-weight:700;width:52px;text-align:right}
+.ts{font-size:11px;color:var(--border);text-align:right;margin-top:8px}
+
+/* ── SPEEDTEST */
+.speed-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px}
+@media(max-width:600px){.speed-grid{grid-template-columns:1fr}}
+.speed-card{
+  background:var(--card);border:1px solid var(--border);border-radius:20px;
+  padding:32px 24px;text-align:center
+}
+.speed-icon{font-size:36px;margin-bottom:10px}
+.speed-val{font-size:38px;font-weight:900;margin-bottom:4px}
+.speed-unit{font-size:14px;color:var(--subtle)}
+.speed-lbl{font-size:12px;color:var(--muted);margin-top:8px}
+.warn-box{
+  background:rgba(245,158,11,.1);border:1px solid var(--yellow);
+  border-radius:10px;padding:10px 16px;color:var(--yellow);font-size:13px;margin-bottom:16px
+}
+.err-box{
+  background:rgba(239,68,68,.1);border:1px solid var(--red);
+  border-radius:14px;padding:24px;text-align:center;margin-bottom:24px
+}
+
+/* ── CHART */
+.chart-wrap{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:12px}
+.chart-hd{font-size:11px;font-weight:700;color:var(--muted);margin-bottom:10px}
+.chart-svg{width:100%;height:80px;display:block;overflow:visible}
+.chart-foot{display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:4px}
+
+/* ── HISTORY TABLE */
+.hist-table{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-top:16px}
+.hist-head{padding:12px 20px;border-bottom:1px solid var(--border);font-size:11px;font-weight:700;color:var(--muted);display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.hist-row{padding:9px 20px;border-bottom:1px solid rgba(255,255,255,.03);display:grid;grid-template-columns:repeat(5,1fr);gap:8px;font-size:12px}
+
+/* ── SEC TAGS */
+.s-ok{background:rgba(34,197,94,.1);color:var(--green);border:1px solid rgba(34,197,94,.3)}
+.s-warn{background:rgba(245,158,11,.1);color:var(--yellow);border:1px solid rgba(245,158,11,.3)}
+.s-bad{background:rgba(239,68,68,.1);color:var(--red);border:1px solid rgba(239,68,68,.3)}
+.s-crit{background:rgba(239,68,68,.2);color:var(--red);border:1px solid var(--red)}
+
+/* ── FOOTER */
+footer{border-top:1px solid var(--border);padding:32px 24px;text-align:center;color:var(--muted);font-size:13px}
+footer strong{color:var(--text)}
+
+/* ── SECTION HEADER */
+.sec-hd{text-align:center;margin-bottom:48px;padding-top:48px}
+.sec-tag2{display:inline-block;background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.25);
+          color:var(--accent2);border-radius:20px;padding:4px 14px;font-size:11px;font-weight:700;
+          letter-spacing:.07em;margin-bottom:12px}
+.sec-hd h2{font-size:clamp(22px,4vw,40px);font-weight:900;margin-bottom:10px}
+.sec-hd p{color:var(--subtle);font-size:14px;line-height:1.7;max-width:500px;margin:0 auto}
+
+/* BIG BUTTON SPEEDTEST */
+.btn-speedtest{
+  display:block;margin:0 auto 32px;
+  padding:16px 48px;border-radius:14px;border:none;cursor:pointer;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  color:#fff;font-size:16px;font-weight:800;
+  box-shadow:0 4px 24px rgba(59,130,246,.4);
+  transition:transform .2s,box-shadow .2s;font-family:inherit
+}
+.btn-speedtest:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 8px 32px rgba(59,130,246,.5)}
+.btn-speedtest:disabled{opacity:.5;cursor:not-allowed;box-shadow:none}
+</style>
+</head>
+<body>
+
+<!-- OFFLINE BANNER -->
+<div id="offline-banner">
+  <span>⚠️ &nbsp;CONNEXION PERDUE — Vous êtes déconnecté du Wi-Fi. Les données affichées ne sont plus mises à jour en temps réel.</span>
+  <button onclick="document.getElementById('offline-banner').classList.remove('show')">✕ Fermer</button>
+</div>
+
+<!-- NAV -->
+<nav id="main-nav">
+  <div class="logo">
+    <div class="logo-icon">Q</div>
+    <div>
+      <div class="logo-name">QoS Buddy</div>
+      <div class="logo-by">by MindForge</div>
+    </div>
+  </div>
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="showTab('dashboard')">📊 Dashboard</button>
+    <button class="nav-tab"       onclick="showTab('speedtest')">⚡ Speedtest</button>
+    <button class="nav-tab"       onclick="showTab('history')">📈 Historique</button>
+  </div>
+  <div class="live-pill">
+    <div id="ndot"></div>
+    <span id="nstatus">En attente</span>
+  </div>
+</nav>
+
+
+<!-- ══════════════════════════ DASHBOARD TAB ══════════════════════════ -->
+<div id="tab-dashboard" class="tab-content active">
+
+  <!-- Hero -->
+  <section class="hero">
+    <div>
+      <div class="hero-badge">🛰️ Surveillance réseau en temps réel</div>
+      <h1>QoS <em>Buddy</em></h1>
+      <p class="hero-desc">
+        Système multi-agents IA de surveillance QoS — détection d'anomalies,
+        prédiction de risques et recommandations en temps réel.
+      </p>
+      <div class="stats-row">
+        <div class="stat-item"><div class="stat-val">6</div><div class="stat-lbl">Agents IA</div></div>
+        <div class="stat-item"><div class="stat-val" id="s-captures">0</div><div class="stat-lbl">Mesures</div></div>
+        <div class="stat-item"><div class="stat-val" id="s-alerts">0</div><div class="stat-lbl">Alertes</div></div>
+        <div class="stat-item"><div class="stat-val" id="s-uptime">0s</div><div class="stat-lbl">Uptime</div></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="wrap">
+
+    <!-- Réseau + contrôles -->
+    <div class="live-top">
+      <div class="net-pill">
+        <span class="net-icon" id="net-icon">📶</span>
+        <div>
+          <div class="net-name-text" id="net-name">Détection en cours...</div>
+          <div class="net-status" id="net-status">
+            <span class="online-txt">● En ligne</span>
+          </div>
+        </div>
+      </div>
+      <div style="font-size:12px;color:var(--muted)">Mise à jour toutes les 5s</div>
+    </div>
+
+    <div class="ctrl-row">
+      <button class="cbtn cbtn-demo" id="btn-demo" onclick="startPipeline('demo')">▶ Démarrer Démo</button>
+      <button class="cbtn cbtn-real" id="btn-real" onclick="startPipeline('run')">📡 Réseau Réel</button>
+      <button class="cbtn cbtn-stop" id="btn-stop" onclick="stopPipeline()" disabled>⏹ Arrêter + PDF</button>
+      <button class="cbtn cbtn-pdf"  id="btn-pdf"  onclick="downloadPdf()">⬇ Rapport PDF</button>
+    </div>
+
+    <div id="pdf-error"></div>
+
+    <!-- Zone de données -->
+    <div id="live-zone">
+      <div class="waiting">
+        <div class="spinner"></div>
+        <p>Lancez la surveillance pour voir les données en temps réel</p>
+      </div>
+    </div>
+
+    <div class="ts" id="ts-label"></div>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════ SPEEDTEST TAB ══════════════════════════ -->
+<div id="tab-speedtest" class="tab-content">
+  <div style="max-width:900px;margin:0 auto;padding:0 24px 80px">
+    <div class="sec-hd">
+      <div class="sec-tag2">SPEEDTEST BY OOKLA</div>
+      <h2>Test de vitesse réseau</h2>
+      <p>Mesurez votre débit réel (téléchargement, envoi, ping) via speedtest-cli (Ookla) intégré au backend Flask.</p>
+    </div>
+
+    <div id="offline-st-warn" class="err-box" style="display:none">
+      <div style="font-size:40px;margin-bottom:12px">📵</div>
+      <div style="color:var(--red);font-weight:700;font-size:16px">Impossible de lancer — vous êtes hors ligne</div>
+      <div style="color:var(--muted);font-size:13px;margin-top:8px">Reconnectez-vous pour tester votre connexion.</div>
+    </div>
+
+    <div style="text-align:center">
+      <button class="btn-speedtest" id="btn-st" onclick="runSpeedtest()">⚡ Lancer le Speedtest</button>
+    </div>
+
+    <div id="st-spinner" class="waiting" style="display:none;margin-bottom:24px">
+      <div class="spinner"></div>
+      <p>Test de vitesse en cours... (30 à 60 secondes)</p>
+      <p style="font-size:12px;margin-top:8px;color:var(--border)">Mesure du débit ↓ puis ↑ via serveur Ookla</p>
+    </div>
+
+    <div id="st-result" style="display:none"></div>
+
+    <div id="st-comparison" style="display:none;margin-top:24px">
+      <div class="panel">
+        <div class="panel-hd">Comparaison Speedtest vs Pipeline</div>
+        <div id="st-compare-body"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════ HISTORY TAB ══════════════════════════ -->
+<div id="tab-history" class="tab-content">
+  <div style="max-width:1100px;margin:0 auto;padding:0 24px 80px">
+    <div class="sec-hd">
+      <div class="sec-tag2">HISTORIQUE</div>
+      <h2>Évolution des métriques</h2>
+      <p>Visualisation des 30 dernières mesures collectées par le pipeline</p>
+    </div>
+    <div id="chart-risk"></div>
+    <div id="chart-lat"></div>
+    <div id="chart-thr"></div>
+    <div id="hist-table-wrap"></div>
+  </div>
+</div>
+
+
+<!-- FOOTER -->
+<footer>
+  <p><strong>QoS Buddy</strong> — développé par <strong>MindForge</strong></p>
+  <p style="margin-top:6px;font-size:11px">Intelligence Artificielle · Surveillance Réseau · XAI · Speedtest Ookla</p>
+</footer>
+
+
+<script>
+const API = 'http://localhost:8000/api';
+
+// ── État global
+let state = {
+  status: null, data: null,
+  isOnline: true, wasOnline: true,
+  history: [],
+  stRunning: false, stResult: null,
+  loopId: null, stPollId: null,
+};
+
+// ════════════ TABS ════════════
+function showTab(name) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  document.querySelectorAll('.nav-tab')[{dashboard:0,speedtest:1,history:2}[name]].classList.add('active');
+}
+
+// ════════════ COULEURS ════════════
+function rCol(s){ return s>=80?'#ef4444':s>=60?'#f97316':s>=30?'#f59e0b':'#22c55e'; }
+function rLbl(s){
+  return s>=80?'Connexion en difficulté grave':s>=60?'Connexion dégradée':
+         s>=30?'Connexion acceptable':'Connexion excellente';
+}
+function dLbl(d){
+  return {IMMEDIATE:'⚠️ Agir immédiatement',URGENT:'🔶 Agir rapidement',
+          ROUTINE:'🔷 Surveiller',NONE:'✅ Aucune action requise'}[d]||d;
+}
+function latCol(v){ return v<100?'#22c55e':v<200?'#f59e0b':'#ef4444'; }
+function losCol(v){ return v===0?'#22c55e':v<1?'#f59e0b':'#ef4444'; }
+function mosCol(v){ return v>=4?'#22c55e':v>=3.6?'#f59e0b':'#ef4444'; }
+function fmtUptime(s){
+  if(!s) return '0s';
+  if(s<60) return s+'s';
+  if(s<3600) return Math.floor(s/60)+'m '+( s%60)+'s';
+  return Math.floor(s/3600)+'h '+Math.floor((s%3600)/60)+'m';
+}
+
+// ════════════ FETCH ════════════
+async function fetchAll() {
+  try {
+    const [sRes, dRes] = await Promise.all([
+      fetch(API+'/status'), fetch(API+'/data'),
+    ]);
+    if (!sRes.ok) throw new Error('API down');
+    const s = await sRes.json();
+    const d = await dRes.json();
+    state.status = s; state.data = d;
+
+    const online = s.is_online !== false;
+    handleOnlineChange(online);
+
+    // Navbar
+    document.getElementById('s-captures').textContent = s.total_captures||0;
+    document.getElementById('s-alerts').textContent   = s.total_alerts||0;
+    document.getElementById('s-uptime').textContent   = fmtUptime(s.uptime_sec||0);
+
+    updateNavPill(s, online);
+    updateNetPill(s, online);
+    updateButtons(s.pipeline_running);
+
+    if (d.ready) {
+      renderDashboard(d);
+      // Historique
+      state.history.push({
+        t:    new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',second:'2-digit'}),
+        lat:  d.kpis?.latency_ms||0,
+        loss: d.kpis?.packet_loss_pct||0,
+        thr:  d.kpis?.throughput_mbps||0,
+        risk: d.risk_score||0,
+      });
+      if (state.history.length > 30) state.history.shift();
+      renderCharts();
+    }
+  } catch(e) {
+    handleOnlineChange(false);
+  }
+}
+
+function handleOnlineChange(online) {
+  const banner = document.getElementById('offline-banner');
+  const osWarn = document.getElementById('offline-st-warn');
+  if (!online && state.wasOnline) {
+    banner.classList.add('show');
+    // Décaler la nav
+    document.getElementById('main-nav').style.top = '44px';
+    document.querySelectorAll('.tab-content').forEach(el => el.style.paddingTop='122px');
+  }
+  if (online && !state.wasOnline) {
+    banner.classList.remove('show');
+    document.getElementById('main-nav').style.top = '';
+    document.querySelectorAll('.tab-content').forEach(el => el.style.paddingTop='');
+  }
+  state.isOnline = online;
+  state.wasOnline = online;
+  if (osWarn) osWarn.style.display = online ? 'none' : 'block';
+}
+
+function updateNavPill(s, online) {
+  const dot    = document.getElementById('ndot');
+  const status = document.getElementById('nstatus');
+  if (!online) {
+    dot.className = 'offline'; status.style.color='#ef4444'; status.textContent='Hors ligne';
+  } else if (s.pipeline_running) {
+    dot.className = 'on'; status.style.color=''; status.textContent = (s.total_captures||0)+' mesures';
+  } else {
+    dot.className = ''; status.style.color=''; status.textContent='En attente';
+  }
+}
+
+function updateNetPill(s, online) {
+  document.getElementById('net-name').textContent = s.network_name||'Réseau local';
+  document.getElementById('net-icon').textContent = online ? '📶' : '📵';
+  const ns = document.getElementById('net-status');
+  ns.innerHTML = online
+    ? '<span class="online-txt">● En ligne</span>'
+    : '<span class="offline-txt">● Hors ligne — connexion perdue</span>';
+}
+
+function updateButtons(running) {
+  document.getElementById('btn-demo').disabled = running;
+  document.getElementById('btn-real').disabled = running;
+  document.getElementById('btn-stop').disabled = !running;
+}
+
+// ════════════ DASHBOARD ════════════
+function renderDashboard(d) {
+  const rs  = parseFloat(d.risk_score)||0;
+  const col = rCol(rs);
+  const kpi = d.kpis||{};
+  const lat = parseFloat(kpi.latency_ms)||0;
+  const los = parseFloat(kpi.packet_loss_pct)||0;
+  const thr = parseFloat(kpi.throughput_mbps)||0;
+  const mos = parseFloat(kpi.mos_proxy)||0;
+  const rfp = Math.round((parseFloat(d.rf_confidence)||0)*100);
+  const R=30, C=2*Math.PI*R;
+  const offset = C*(1-rs/100);
+
+  // Horizons
+  const hHTML = [20,60,300].map(h => {
+    const hd = (d.horizons||{})[h]||{};
+    const sc = hd.score||0, c=rCol(sc);
+    const lb = h===20?'Dans 20s':h===60?'Dans 1 min':'Dans 5 min';
+    return `<div class="h-row">
+      <span class="h-lbl">${lb}</span>
+      <div class="h-bg"><div class="h-fill" style="width:${sc}%;background:${c}"></div></div>
+      <span class="h-score" style="color:${c}">${Math.round(sc)}/100</span>
+    </div>`;
+  }).join('');
+
+  // Sécurité
+  const sec  = d.security||{};
+  const secSt= sec.status||'CLEAN';
+  const secMap={
+    CLEAN: {cls:'s-ok', lbl:'✅ Réseau sécurisé'},
+    LOW:   {cls:'s-warn',lbl:'⚠️ Risque faible'},
+    MEDIUM:{cls:'s-warn',lbl:'⚠️ Menace modérée'},
+    HIGH:  {cls:'s-bad', lbl:'🚨 Menace élevée'},
+    CRITICAL:{cls:'s-crit',lbl:'🔴 ALERTE SÉCURITÉ'},
+  };
+  const secCfg = secMap[secSt]||secMap.CLEAN;
+  const atkTxt = (sec.attacks||[]).length ? sec.attacks.join(' · ') : 'Aucune menace détectée';
+
+  // Actions
+  const pLbl={1:'URGENT',2:'IMPORTANT',3:'PLANIFIER',4:'INFO'};
+  const pCss={1:'background:rgba(239,68,68,.15);color:#ef4444',
+              2:'background:rgba(249,115,22,.15);color:#f97316',
+              3:'background:rgba(245,158,11,.15);color:#f59e0b',
+              4:'background:rgba(59,130,246,.12);color:#3b82f6'};
+  const aHTML = (d.actions||[]).slice(0,5).map(a=>{
+    const p=a.priority||4;
+    return `<div class="arow">
+      <span class="abadge" style="${pCss[p]||pCss[4]}">${pLbl[p]||'P'+p}</span>
+      <span style="font-size:12px;color:var(--subtle)">${a.label||a.action}</span>
+    </div>`;
+  }).join('')||'<span style="color:var(--muted);font-size:13px">Réseau stable — aucune action requise.</span>';
+
+  // SHAP
+  let shapHTML='';
+  if((d.shap_features||[]).length){
+    const rows = d.shap_features.map(f=>{
+      const abs=Math.abs(f.shap_value);
+      const pct=Math.min(100,(abs/0.5)*100);
+      const c = f.shap_value>0?'#ef4444':'#22c55e';
+      return `<div class="srow">
+        <span class="sname">${f.feature}</span>
+        <div class="sbg"><div class="sfill" style="width:${pct}%;background:${c}"></div></div>
+        <span class="sval" style="color:${c}">${f.shap_value>0?'+':''}${f.shap_value.toFixed(3)}</span>
+      </div>`;
+    }).join('');
+    shapHTML=`<div class="panel full">
+      <div class="panel-hd">Pourquoi cette alerte ? — Facteurs SHAP</div>
+      ${rows}
+      <p style="font-size:11px;color:var(--muted);margin-top:10px">Rouge = aggrave le risque · Vert = améliore la situation</p>
+    </div>`;
+  }
+
+  document.getElementById('live-zone').innerHTML = `
+    <!-- Carte Risque -->
+    <div class="risk-card" style="border-color:${col};background:${col}08">
+      <div class="gauge-wrap">
+        <svg width="80" height="80" viewBox="0 0 80 80">
+          <circle cx="40" cy="40" r="${R}" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="8"/>
+          <circle cx="40" cy="40" r="${R}" fill="none" stroke="${col}" stroke-width="8"
+            stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${offset}"
+            style="transition:stroke-dashoffset .8s"/>
+        </svg>
+        <div class="gauge-label">
+          <div class="gauge-num" style="color:${col}">${Math.round(rs)}</div>
+          <div class="gauge-sub">/100</div>
+        </div>
+      </div>
+      <div class="risk-info">
+        <h2 style="color:${col}">${rLbl(rs)}</h2>
+        <p>${dLbl(d.decision_raw)}</p>
+        <span class="rf-tag">État : ${d.rf_class} — ${rfp}% certitude</span>
+      </div>
+    </div>
+
+    <!-- KPIs -->
+    <div class="kpi-grid">
+      <div class="kpi">
+        <div class="kpi-val" style="color:${latCol(lat)}">${lat.toFixed(1)}<small style="font-size:12px;font-weight:400"> ms</small></div>
+        <div class="kpi-lbl">Temps de réponse</div>
+        <div class="kpi-bar" style="background:${latCol(lat)}"></div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-val" style="color:${losCol(los)}">${los.toFixed(2)}<small style="font-size:12px;font-weight:400"> %</small></div>
+        <div class="kpi-lbl">Paquets perdus</div>
+        <div class="kpi-bar" style="background:${losCol(los)}"></div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-val" style="color:#3b82f6">${thr.toFixed(1)}<small style="font-size:12px;font-weight:400"> Mbps</small></div>
+        <div class="kpi-lbl">Débit réseau</div>
+        <div class="kpi-bar" style="background:#3b82f6"></div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-val" style="color:${mosCol(mos)}">${mos.toFixed(2)}<small style="font-size:12px;font-weight:400">/5</small></div>
+        <div class="kpi-lbl">Qualité appels (MOS)</div>
+        <div class="kpi-bar" style="background:${mosCol(mos)}"></div>
+      </div>
+    </div>
+
+    <!-- Panels -->
+    <div class="panels">
+      <div class="panel">
+        <div class="panel-hd">Prédiction des risques</div>
+        ${hHTML}
+      </div>
+      <div class="panel">
+        <div class="panel-hd">Sécurité réseau</div>
+        <span class="sec-badge ${secCfg.cls}">${secCfg.lbl}</span>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:6px">${sec.n_events} événement(s) détecté(s)</div>
+        <div style="font-size:12px;color:var(--subtle)">${atkTxt}</div>
+      </div>
+      <div class="panel">
+        <div class="panel-hd">État détaillé</div>
+        <div class="mrow"><span class="mlbl">Signal RF</span><span class="mval">${kpi.rsrp_category}</span></div>
+        <div class="mrow"><span class="mlbl">Alertes graves</span><span class="mval" style="color:${d.n_critical>0?'#ef4444':'#22c55e'}">${d.n_critical}</span></div>
+        <div class="mrow"><span class="mlbl">Alertes mineures</span><span class="mval" style="color:${d.n_warnings>0?'#f59e0b':'#22c55e'}">${d.n_warnings}</span></div>
+        <div class="mrow"><span class="mlbl">Mesures totales</span><span class="mval" style="color:#3b82f6">${d.total_captures}</span></div>
+        <div class="mrow"><span class="mlbl">Alertes totales</span><span class="mval" style="color:#ef4444">${d.total_alerts}</span></div>
+      </div>
+      <div class="panel">
+        <div class="panel-hd">Que faire ?</div>
+        ${aHTML}
+      </div>
+      ${shapHTML}
+    </div>
+  `;
+
+  document.getElementById('ts-label').textContent = 'Dernière mise à jour : '+new Date().toLocaleTimeString('fr-FR');
+}
+
+// ════════════ PIPELINE CONTROLS ════════════
+async function startPipeline(mode) {
+  try {
+    const r = await fetch(API+'/start/'+mode);
+    const j = await r.json();
+    if (j.error) { alert(j.error); return; }
+    setTimeout(fetchAll, 1500);
+  } catch(e) { alert('Impossible de joindre le serveur Flask (localhost:8000).'); }
+}
+
+async function stopPipeline() {
+  try {
+    await fetch(API+'/stop');
+    setTimeout(fetchAll, 1500);
+  } catch(e) {}
+}
+
+async function downloadPdf() {
+  const errEl = document.getElementById('pdf-error');
+  errEl.classList.remove('show');
+  const btn = document.getElementById('btn-pdf');
+  btn.textContent = '⏳ Génération...'; btn.disabled = true;
+  try {
+    const r = await fetch(API+'/pdf');
+    if (!r.ok) {
+      let msg = 'Erreur PDF';
+      try { const j=await r.json(); msg=j.error||(j.hint||msg); } catch(_){}
+      errEl.textContent = '⚠️ ' + msg;
+      errEl.classList.add('show');
+      return;
+    }
+    const blob = await r.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href=url; a.download='rapport_qos_buddy.pdf';
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch(e) {
+    errEl.textContent = '⚠️ Erreur réseau : ' + e.message;
+    errEl.classList.add('show');
+  } finally {
+    btn.textContent='⬇ Rapport PDF'; btn.disabled=false;
+  }
+}
+
+// ════════════ SPEEDTEST ════════════
+async function runSpeedtest() {
+  if (!state.isOnline) { alert('Pas de connexion internet.'); return; }
+  const btn = document.getElementById('btn-st');
+  btn.disabled = true; btn.textContent='⏳ Test en cours...';
+  document.getElementById('st-spinner').style.display='block';
+  document.getElementById('st-result').style.display='none';
+  document.getElementById('st-comparison').style.display='none';
+  state.stRunning=true; state.stResult=null;
+  try {
+    const r = await fetch(API+'/speedtest/run',{method:'POST'});
+    const j = await r.json();
+    if(j.error){ alert(j.error); finishSt(btn); return; }
+    // Polling
+    if(state.stPollId) clearInterval(state.stPollId);
+    state.stPollId = setInterval(pollSpeedtest.bind(null,btn), 2000);
+  } catch(e){ alert('Erreur : '+e.message); finishSt(btn); }
+}
+
+async function pollSpeedtest(btn) {
+  try {
+    const r = await fetch(API+'/speedtest/result');
+    const j = await r.json();
+    if (!j.running && j.result) {
+      clearInterval(state.stPollId);
+      state.stResult = j.result;
+      renderSpeedtest(j.result);
+      finishSt(btn);
+    }
+  } catch(e){}
+}
+
+function finishSt(btn) {
+  document.getElementById('st-spinner').style.display='none';
+  btn.disabled=false; btn.textContent='⚡ Lancer le Speedtest';
+  state.stRunning=false;
+}
+
+function renderSpeedtest(r) {
+  const wrap = document.getElementById('st-result');
+  wrap.style.display='block';
+
+  const isEst = r.source && r.source.includes('estimation');
+  const warnHTML = isEst
+    ? `<div class="warn-box">ℹ️ speedtest-cli non installé — résultats estimés depuis le pipeline.<br>
+       Pour des mesures réelles Ookla : <code>pip install speedtest-cli</code></div>`
+    : '';
+
+  if (r.error) {
+    wrap.innerHTML=`<div class="err-box" style="padding:20px">
+      <div style="color:var(--red);font-weight:700">⚠️ ${r.error}</div>
+    </div>`;
+    return;
+  }
+
+  const dlCol = r.download_mbps>50?'#22c55e':r.download_mbps>10?'#3b82f6':'#f59e0b';
+  const ulCol = r.upload_mbps>20?'#22c55e':r.upload_mbps>5?'#6366f1':'#f59e0b';
+  const piCol = r.ping_ms<50?'#22c55e':r.ping_ms<150?'#f59e0b':'#ef4444';
+
+  wrap.innerHTML = `
+    ${warnHTML}
+    <div class="speed-grid">
+      <div class="speed-card">
+        <div class="speed-icon">⬇</div>
+        <div class="speed-val" style="color:${dlCol}">${r.download_mbps}</div>
+        <div class="speed-unit">Mbps</div>
+        <div class="speed-lbl">Téléchargement</div>
+      </div>
+      <div class="speed-card">
+        <div class="speed-icon">⬆</div>
+        <div class="speed-val" style="color:${ulCol}">${r.upload_mbps}</div>
+        <div class="speed-unit">Mbps</div>
+        <div class="speed-lbl">Envoi</div>
+      </div>
+      <div class="speed-card">
+        <div class="speed-icon">🏓</div>
+        <div class="speed-val" style="color:${piCol}">${r.ping_ms}</div>
+        <div class="speed-unit">ms</div>
+        <div class="speed-lbl">Ping</div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-hd">Détails du test</div>
+      ${[
+        ['Serveur',      r.server_name],
+        ['Pays',         r.server_country],
+        ['FAI détecté',  r.isp],
+        ['Source',       r.source],
+        ['Heure du test',r.timestamp],
+      ].filter(([,v])=>v).map(([k,v])=>`
+        <div class="mrow"><span class="mlbl">${k}</span><span class="mval">${v}</span></div>
+      `).join('')}
+    </div>
+  `;
+
+  // Comparaison pipeline
+  if (state.data?.ready) {
+    const kpi = state.data.kpis||{};
+    document.getElementById('st-comparison').style.display='block';
+    document.getElementById('st-compare-body').innerHTML = `
+      <div class="mrow">
+        <span class="mlbl">Débit</span>
+        <span class="mval" style="color:#3b82f6">Pipeline : ${(kpi.throughput_mbps||0).toFixed(1)} Mbps</span>
+        <span class="mval" style="color:#6366f1;margin-left:12px">Speedtest : ${r.download_mbps} Mbps</span>
+      </div>
+      <div class="mrow">
+        <span class="mlbl">Latence</span>
+        <span class="mval" style="color:#3b82f6">Pipeline : ${(kpi.latency_ms||0).toFixed(1)} ms</span>
+        <span class="mval" style="color:#6366f1;margin-left:12px">Speedtest : ${r.ping_ms} ms</span>
+      </div>
+    `;
+  }
+}
+
+// ════════════ CHARTS ════════════
+function renderCharts() {
+  const h = state.history;
+  if (!h.length) return;
+  renderMiniChart('chart-risk','Score de risque',h,'risk','#ef4444',100);
+  renderMiniChart('chart-lat', 'Latence (ms)',   h,'lat', '#f97316');
+  renderMiniChart('chart-thr', 'Débit (Mbps)',   h,'thr', '#3b82f6');
+
+  // Table
+  const tw = document.getElementById('hist-table-wrap');
+  const rows = [...h].reverse().map(r=>`
+    <div class="hist-row">
+      <span style="color:var(--muted)">${r.t}</span>
+      <span style="color:${rCol(r.risk)};font-weight:700">${Math.round(r.risk)}</span>
+      <span style="color:${latCol(r.lat)}">${r.lat.toFixed(1)} ms</span>
+      <span style="color:${losCol(r.loss)}">${r.loss.toFixed(2)}%</span>
+      <span style="color:#3b82f6">${r.thr.toFixed(1)} Mbps</span>
+    </div>
+  `).join('');
+  tw.innerHTML=`<div class="hist-table">
+    <div class="hist-head"><span>HEURE</span><span>RISQUE</span><span>LATENCE</span><span>PERTE</span><span>DÉBIT</span></div>
+    ${rows}
+  </div>`;
+}
+
+function renderMiniChart(id, label, data, field, color, maxY) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const vals = data.map(d=>d[field]);
+  const max  = maxY || Math.max(...vals, 1);
+  const W=400, H=60, n=vals.length;
+  const pts = vals.map((v,i)=>{
+    const x=(i/(n-1||1))*W;
+    const y=H-(v/max)*H;
+    return `${x},${y}`;
+  }).join(' ');
+  const circles = vals.map((v,i)=>{
+    const x=(i/(n-1||1))*W;
+    const y=H-(v/max)*H;
+    return `<circle cx="${x}" cy="${y}" r="3" fill="${color}"/>`;
+  }).join('');
+  const cur = vals[vals.length-1]?.toFixed(1)||'0';
+  el.innerHTML=`
+    <div class="chart-wrap">
+      <div class="chart-hd">${label}</div>
+      <svg class="chart-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+        <polyline points="${pts}" fill="none" stroke="${color}" stroke-width="2"/>
+        ${circles}
+      </svg>
+      <div class="chart-foot">
+        <span>${data[0]?.t||''}</span>
+        <span style="color:${color};font-weight:700">Actuel : ${cur}</span>
+        <span>${data[data.length-1]?.t||''}</span>
+      </div>
+    </div>`;
+}
+
+// ════════════ INIT ════════════
+fetchAll();
+setInterval(fetchAll, 5000);
+</script>
+</body>
+</html>
